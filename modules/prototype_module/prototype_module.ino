@@ -193,7 +193,6 @@ enum Commands
     SetTime = 0x5e,
     SetSchedule = 0x6c,
     SetMotorTime = 0x7a,
-    BroadcastId = 0x0aaa,
 };
 
 void process_cmd(MasterRequest *request)
