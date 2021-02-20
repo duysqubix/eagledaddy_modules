@@ -57,8 +57,7 @@ enum StatusCodes{
 };
 
 enum Commands{
-    Report=0x69,
-    Ping=0xBA
+    Ping=0x69 // only command that skips generate_response hook and sends back empty packet
 };
 
 class RecieveFrame{
