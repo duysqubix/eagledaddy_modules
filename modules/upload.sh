@@ -1,1 +1,1 @@
-arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno $1 -vv
+arduino-cli upload -p $1 --fqbn arduino:avr:uno $2 -vv
