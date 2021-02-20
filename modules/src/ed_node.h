@@ -13,11 +13,10 @@
  *  generate_response
  * 
  * If left alone, this code will still compile, but will not necessary do anything useful. It is the responsbility
- * of programmer to generate a default 'report/response' when communicated too. The are only two commands known to ALL
- * nodes is the cmd:
+ * of programmer to generate a default 'report/response' when communicated too. The is only one commands known to ALL
+ * nodes:
  * 
- *  0x69 <- which defaults to reporting whatever is populated in user-defined `generate_response` function.
- *  0xBA <- which skips `generate_response` and sends back an empty packet (used for pings)
+ *  0x69 <- which skips `generate_response` and sends back an empty packet (used for pings ...also.. nice)
  * 
  * Incoming Json Structure will be:
  * 
@@ -41,9 +40,9 @@
 
 
 #define ABS_MAX_PAYLOAD_SIZE 256  // absolute maximum payload size for 900Mhz DigiMesh Device
-#define RX_HEADER_SIZE 15
+#define RX_HEADER_SIZE 15           // header offset size before getting to rf_data
 #define MAX_RF_DATA_LEN ABS_MAX_PAYLOAD_SIZE
-#define MAX_RX_PACKET_LEN (MAX_RF_DATA_LEN+RX_HEADER_SIZE)
+#define MAX_RX_PACKET_LEN (MAX_RF_DATA_LEN+RX_HEADER_SIZE) // largest absolute size of incoming rcv  packet by an xbee
 #define JSON_OBJ_SIZE 200
 
 typedef unsigned long long uint64_t;
@@ -60,6 +59,11 @@ enum Commands{
     Ping=0x69 // only command that skips generate_response hook and sends back empty packet
 };
 
+
+/**
+ * 
+ * Data structure for holding rcv rf_data.
+ * **/
 class RecieveFrame{
   public:
     uint64_t source_addr;
@@ -89,7 +93,8 @@ RecieveFrame::RecieveFrame(uint8_t *raw_pkt, uint8_t pkt_size){
       2-9 byte: src addr 
       10-11 byte: reserved
       12 bytes: rcv_opts 
-      13-: payload
+      13-n: payload
+      n+1: chksum
       **/
       uint8_t addr_size = sizeof(uint64_t);
       uint8_t _addr[addr_size];
@@ -99,9 +104,11 @@ RecieveFrame::RecieveFrame(uint8_t *raw_pkt, uint8_t pkt_size){
         *(_addr+i) = *(raw_pkt + i+1); 
       }
 
-      reverse(_addr, addr_size);
+      reverse(_addr, addr_size); // reverse order so it can store address correctly as uint64_t
       memcpy(&this->source_addr, _addr, sizeof(uint64_t));
-      memcpy(this->rf_data, raw_pkt+12, pkt_size);
+
+
+      memcpy(this->rf_data, raw_pkt+12, pkt_size); // store rf_data using pkt_size and offset needed to beging at rf_data
 
     }
 
@@ -129,6 +136,9 @@ void reverse(uint8_t arr[], uint8_t n)
  * 
  * Chksum is calculated by by adding all bytes (except delim, and length bytes)
  * subtracting result by 0xff and truncating to 8bit value
+ * 
+ * 
+ * Simple three time polling method to send TX rquest, by monitoring status packet. 
  * **/
 void transmit_request(RecieveFrame *rcv, uint8_t *data, uint8_t len)
 {
@@ -172,7 +182,6 @@ void transmit_request(RecieveFrame *rcv, uint8_t *data, uint8_t len)
     // now attempt to send it, it will try a max of three times
     // if it doesn't recieve a transmit status report, within the alloted timeout and max tries has been attempted,
     // it will silently discard everything, and return to normal mode
-
     uint8_t status[11];
     bool success = false;
     while (tries < max_tries)
@@ -222,6 +231,7 @@ byte bcdToDec(byte val) // Convert binary coded decimal to normal decimal number
  * 
  * Deserialize and handle any errors
  * 
+ * call `handle_deserialize_error`
  * call `generate_response` hook
  * 
  * allocate buffer and store serialized json object
